@@ -1,0 +1,316 @@
+---
+title: "Clustering using the kmeans algorithm"
+author: "Bealy MECH"
+date: "10/28/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercice 1 : Partition and Matrix
+Write the R code which produces the partition matrix
+
+### 1st solution
+```{r}
+data(iris)
+dim(iris)
+```
+
+```{r}
+X <- iris[, 1:4] # we don't consider the last column which is "Species"
+library(nnet)
+# la matrice de la partition
+C <- class.ind(iris$Species)
+```
+
+La matrice C renvoit 1 si la ligne est dans l'espace (same species), O sinon.
+
+```{r}
+summary(iris$Species)  # There are 3 species, normally
+```
+
+```{r}
+t(X) %*% C
+```
+
+```{r}
+diag(t(C) %*% C)   # return the number of each species 
+```
+
+```{r}
+# the matrix of gravity centers of the quantitative variables
+t((t(X) %*% C)/diag(t(C) %*% C))
+```
+
+### Remarque 
+* $t(C) * C$ renvoie une matrice diagonale donnant le nombre dans chaque espece, et donc $diagonal(t(C) * C)$ renvoie un vecteur composé de la diagonale.
+* La dernière matrice donne la moyenne par espece et par variable.
+
+### 2nd solution 
+
+```{r}
+X <- iris[, 1:4]
+dim(X)
+```
+
+```{r}
+names(X)
+```
+
+```{r}
+cluster <- iris$Species
+# Compute the matrix C = (Cik) where Cik=1 if i belongs to Ck, 0 otherwise 
+C <- matrix(0, 150, 3)  # matrix 0 composes of 150 rows and 3 columns
+for (i in seq(1, 150)) { # from 1 to 150 increase by 1
+  if(cluster[i] == "setosa") {
+    C[1, 1] = 1  # first column is the data of species "setosa"
+  }
+  if(cluster[i] == "versicolor") {
+    C[i, 2] = 1  # second column is the data of species "versicolor"
+  }
+  if(cluster[i] == "virginica") {
+    C[i, 3] = 1  # third column is the data of species "virginica"
+  }
+} 
+# verify the matrix C
+```
+
+Compute M which represents the matrix of gravity center.
+
+```{r}
+X <- as.matrix(X)
+M <- solve(t(C)%*%C)%*%t(C)%*%X
+M
+```
+
+```{r}
+dX <- dist(X)
+classif <- hclust(d = dX, method = "ward.D2")
+plot(classif)
+```
+
+```{r}
+plot(rev(classif$height), type='l', main="hauteurs du dendrogramme décroissantes", ylab="classif$height", xlab="", las=1, col="blue")
+
+points(1:length(classif$height), rev(classif$height), pch=20, col="red")
+```
+
+```{r}
+c <- (cbind(1:length(classif$height), rev(classif$height)))
+```
+
+```{r}
+c2 <- diff(c[,2])
+res <- diff(c2)
+P <- X
+RSQ <- rep(0, nrow(P))
+SQTot <- sum(scale(P,scale=FALSE)^2)
+for (i in 1:nrow(P)){
+  Cla <- as.factor(cutree(hclust(dX,"ward.D2"),i))
+  RSQ[i] <- sum(t((t(sapply(1:ncol(P),function(i) tapply(P[,i],Cla,mean)))-apply(P,2,mean))^2)*as.vector(table(Cla)))/SQTot
+}
+plot(RSQ, type='l', col="red",xlab="nombre de classes")
+points(1:length(RSQ),RSQ,pch=20, col="blue")
+abline(h=1)
+```
+
+## Exercise 2 : The Bell Number
+
+  1. Show that the number of partition of n objects verifies:
+  $$B_{n+1} = \sum_{k=0}^{n} B_{k}$$
+Cette formule s'appelle également \textbf{la relation d'Aitken}.
+
+
+## Exercise 4 : Clustering of the crabs (library MASS)
+
+```{r}
+library(MASS)
+data(crabs)
+dim(crabs)
+```
+
+```{r}
+names(crabs)
+```
+
+\textbf{Represent all crabs with a color corresponding to the specy and symbol to the sex}
+
+```{r}
+plot(crabs, col = "blue")
+```
+
+```{r}
+pairs(crabs, col = c("blue", "red")[crabs$sp], pch = c(20, 21)[crabs$sex])
+```
+
+```{r}
+crabsquant <- crabs[, 4:8]
+pairs(crabsquant, col = c("blue", "red")[crabs$sp], pch = c(20, 21)[crabs$sex])
+```
+
+```{r}
+# set a color for each specy and a different symbol per sex
+summary(crabs$sex)  # Male and Female
+```
+
+### Use kmeans to find 4 classes in crabsquant 
+
+```{r}
+nbclasse <- 4
+KM <- kmeans(crabsquant, nbclasse)
+plot(crabsquant, asp = 1, pch = 19, col = rainbow(nbclasse)[KM$cluster])
+points(KM$centers, pch = 8, col = rainbow(nbclasse)[KM$cluster], cex = 2)
+```
+
+```{r}
+trueClasses <- paste(crabs$sex, crabs$sp, sep = "-")
+table(trueClasses, KM$cluster)
+```
+
+```{r}
+pairs(crabsquant, col = KM$cluster)
+```
+
+```{r}
+pairs(crabsquant, col = as.factor(trueClasses))
+```
+
+### Clustering of raw data
+
+```{r}
+TrueClasses_mat <- matrix(c(1,2,3,4), 2, 2)
+TrueClasses_mat
+```
+
+```{r}
+colnames(TrueClasses_mat) <- levels(crabs$sex)
+rownames(TrueClasses_mat) <- levels(crabs$sp)
+TrueClasses_mat
+```
+
+```{r}
+TrueClasses <- diag(TrueClasses_mat[crabs$sex, crabs$sp])
+TrueClasses
+```
+
+Truclass_mat associe a chaque couple (sp, sex) un numéro de classe. TrueClasses_mat[crabs$sex, crabs$sp] applique a chaque couple possible des 2 variables la valeur, seul la diagonale correspond au vrai couple.
+
+```{r}
+res <- kmeans(crabsquant, 4)
+str(res)  # structure of an R project
+```
+
+```{r}
+res
+```
+
+```{r}
+pairs(crabsquant, col = res$cluster) # we have 4 classes, so 4 colors for clustering k-means
+```
+
+```{r}
+pairs(crabsquant, col = as.factor(TrueClasses))
+```
+
+```{r}
+z <- kde2d(crabsquant[,2], crabsquant[,4]) 
+contour(z, col = "purple")
+# placons les points dans le graphe de contour z
+points(crabsquant[,c(2,4)], col = c("blue", "orange")[crabs$sp], pch = c(20,21)[crabs$sex])
+# placons encore les centres des classes
+points(res$center[,c(2,4)], cex = 2, pch = 25, bg = "red")
+```
+
+### Clustering for raw data
+
+```{r}
+table(Kmeans = res$cluster, TrueClasses)
+```
+
+```{r}
+WSS <- function(partition) {
+  sum(partition$withinss)
+}
+sortie = matrix(rep(0,4000), nrow = 1000, ncol = 4)
+WSSvector <- rep(0,1000)
+for (i in 1:1000) {
+  res <- kmeans(crabsquant,4)
+  sortie[i,] <- res$withinss
+  WSSvector[i] <- WSS(res)
+}
+summary(WSSvector)
+```
+
+```{r}
+hist(WSSvector, breaks = 20)
+```
+
+Tained a bad result because of size effect (latent factor):
+  * the size information is present in all variables
+  * this has a masking effect
+Solution: Divide all variables by one of them allows us to have features which are relative.
+
+
+```{r}
+library(MASS)
+n <- dim(crabs)[1]   # the number of rows, nb d'individus
+dim(crabs)   # dimension of dataset "crabs
+```
+
+```{r}
+crabsquant <- crabs[,4:8]
+# faisons une simple petite transformation pour enlever l'effet de taille
+crabsquant2 <- (crabsquant/crabsquant[,3])[,-3]
+j=0
+for (i in c(1,2,4,5)) {
+  j = j + 1
+  names(crabsquant2)[j] <- paste(names(crabsquant)[j],"/",names(crabsquant[3]))
+}
+```
+
+```{r}
+res_bis <- kmeans(crabsquant2, 4)
+z <- kde2d(crabsquant2[,2], crabsquant2[,4])
+contour(z, col = "purple")
+# placons les points dans le graphe de contour z
+points(crabsquant2[,c(2,4)], col = c("blue", "orange")[crabs$sp], pch = c(20,21)[crabs$sex])
+# placons encore les centres des classes
+points(res_bis$center[,c(2,4)], cex = 2, pch = 25, bg = "red")
+```
+
+### Clustering for the transformed dataset
+
+```{r}
+table(Kmeans = res_bis$cluster, TrueClasses)
+```
+
+### How many clusters ?
+
+```{r}
+WSSkcluster <- rep(0,20)
+for (k in 1:20) {
+  WSSmax <- Inf
+for (i in 1:10) {
+  res <- kmeans(crabsquant2,k)
+if (WSS(res) < WSSmax) {
+  partition <- res
+  WSSmax <- WSS(res)
+}
+}
+  WSSkcluster[k] <- WSS(partition)
+}
+plot(WSSkcluster, xlab = "Number of clusters", ylab = "WSS", main = "Evolution of WSS with the number of cluster")
+lines(WSSkcluster, col = "red")
+```
+
+
+
+
+
+
+
+

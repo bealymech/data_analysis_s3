@@ -1,0 +1,65 @@
+---
+title: "Mixture Models"
+author: "Bealy MECH"
+date: "10/18/2021"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exo1: 1D mixture of Gaussians
+
+```{r, include=TRUE}
+#a)
+library(mclust)
+nks = rmultinom(1, 1000, prob = c(1/3, 2/3))
+means = c(0,4)
+sds = c(1,1/2)
+samples = mapply(function(nk, mean, sd){rnorm(nk, mean, sd)}, nks, means, sds)
+x = unlist(samples)
+hist(x)
+
+# Draw the distribution
+curve(dnorm(x, mean = 4, sd = 1/2), -2, 7, col = "blue")
+curve(dnorm(x, mean = 0, sd = 1), -2, 7, add = TRUE, col = "orange") # add = true let 2 dist displays on the same graphs
+
+mixture = function(x){
+  1/3*dnorm(x, mean = 0, sd = 1) + 2/3*dnorm(x, mean = 4, sd = 1/2)
+}
+curve(mixture(x),-2,7,add = TRUE, col = "red")
+#b)
+res.kmeans = kmeans(unlist(samples), 2, nstart = 10)
+plot(unlist(samples), asp = 1, pch = 19, col = rainbow(2)[res.kmeans$cluster])
+list.of.cluster = split(data.frame(x), res.kmeans$cluster)
+#4)
+res.E = Mclust(x, modelNames = "E")
+plot(res.E, "BIC") #7
+res.V = Mclust(x, modelNames = "V")
+plot(res.V, "BIC") #2
+```
+
+## Exo2: 2D Mixture
+```{r, include=TRUE}
+#1)
+data("faithful")
+#2)
+plot(faithful)
+#3)
+res = Mclust(faithful)
+summary(res)
+#4)
+plot(res, "BIC")
+plot(res, "uncertainty")
+plot(res, "classification")
+plot(res, "density")
+#5)
+image(as.matrix(dist(faithful)))
+res = hclust(dist(faithful), method = "ward.D")
+plot(res)
+#6)
+```
+

@@ -1,0 +1,255 @@
+---
+title: "Principle Component Analysis - PCA"
+author: "Bealy MECH"
+date: "11/15/2021"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercice 1 : Coding PCA
+
+1) Code my own PCA:
+
+On centre sans réduire les données, puis calcul de la variance de X, ensuite la valeur propre de la matrice de variance.
+
+```{r}
+# Data input
+X <- read.table(text = "
+              math  scie  fran  lati   d-m
+jean            6.0   6.0   5.0   5.5   8.0
+aline           8.0   8.0   8.0   8.0   9.0
+annie           6.0   7.0  11.0   9.5  11.0
+monique        14.5  14.5  15.5  15.0   8.0
+didier         14.0  14.0  12.0  12.5  10.0
+andre          11.0  10.0   5.5   7.0  13.0
+pierre          5.5   7.0  14.0  11.5  10.0
+brigitte       13.0  12.5   8.5   9.5  12.0
+evelyne         9.0   9.5  12.5  12.0  18.0
+")
+# create a table in pdf
+knitr::kable(X, format = "latex", caption = "Tableau centré", digits = 2)
+X
+X <- scale(X, center = TRUE, scale = FALSE)
+S <- var(X) # la matrice de variance
+res.mypca <- eigen(S) # compute the eigenvalues and eigenvectors of S
+Lambda <- res.mypca$values # the eigenvalues of S
+Lambda
+U <- res.mypca$vectors # the eigenvector of S
+C <- X%*%U
+plot(C[,1:2], col = "red") # run plot together with text
+text(C[,1:2], row.names(X))
+
+# Compare with code
+res.pca <- prcomp(X) # Principale Components Analysis
+summary(res.pca)  
+
+lamb <- res.pca$sdev**2
+lamb
+barplot(cumsum(lamb)/sum(lamb)) # we see last 3 variables are almost equal to 1, 
+# which means that only these 3 variables will give us almost 100% of their information
+plot(res.pca) #give the variance of each variables
+biplot(res.pca) # give the direction of 5 variables into 2 new PCs
+abline(h=0, v=0)
+
+biplot(res.pca, choices = c(2,3)) #PC2 = C2, PC1 = C2 where PC is Principale Component
+abline(h=0, v=0)
+```
+
+# Exercice 2 : PCA and size effect
+
+```{r}
+library(MASS)
+data(crabs)
+crabsquant <- crabs[,4:8] # we don't want those 3 first variables qualitative
+dim(crabsquant) # the dataset now consists of 200 crabs, with 5 variables quantitative
+```
+
+let's see the correlation matrix:
+
+```{r}
+cor(crabsquant)
+```
+
+Those variables are extremely correlated.
+
+```{r}
+# 1) Test a PCA crabsquant without any preliminary transformation
+crabs.pca <- prcomp(scale(crabsquant))
+summary(crabs.pca) # the proportion of variance of PC1 is: 98.25% and PC2 is: 0.906%
+plot(crabs.pca) # the variance of each variables
+biplot(crabs.pca) # the direction of 5 variables into PC1 and PC2
+abline(h=0, v=0) # add the line h=0 and v=0
+```
+
+
+```{r}
+# 2) We use the library FactorMineR to improve the quality of PCA
+library(FactoMineR)
+sex.sp <- crabs$sex:crabs$sp # related sex vs species
+X <- data.frame(crabsquant, sex.sp) # add the column sex.sp to the dataframe with crabsquant data
+dim(X) 
+res <- PCA(X, quali.sup = 6) # the 6th vector indicates the indexes of the categorical supplementary variables
+plot.PCA(res, axes = c(2, 3), 
+         col.ind.sup = c("blue1", "orange1", "blue4", "orange4")[sex.sp])
+```
+
+```{r}
+pairs(crabsquant,col=c("blue","orange")[crabs$sp],pch=c(20,21)[crabs$sex])
+res<-princomp(scale(crabsquant))
+plot(res$scores[,1:2],col=c("blue","orange")[crabs$sp],pch=c(20,21)[crabs$sex])
+```
+
+
+```{r}
+library(ggplot2)
+respca <- prcomp(X[,1:5], scale. = TRUE) 
+respca
+p <- ggplot(data = data.frame(respca$x), aes(x=PC2, y=PC3)) +
+  geom_point(colour = c("blue1", "orange1", "blue4", "orange4")[sex.sp]) +
+  geom_vline(xintercept = 0) + # vertical line
+  geom_hline(yintercept = 0) + # horizontal line
+  geom_density2d() # add the density in 2d (contour line)
+p
+ggsave(filename = "pca.pdf", p) # save file with name "pca.pdf", open in terminal by tapping p
+```
+
+# Exercice 3 : Phylogeny of Globins
+
+Let's us check that it's a dissimilarity dataset if it follows the conditions below:
+
+1. The matrix is symmetric
+
+2. The diagonal of the matrix is equal to zeros
+
+```{r}
+# 1) Load the data
+Delta <- read.table(file = "neighbor_globin.txt", header = FALSE, row.names = 1)
+Delta <- as.matrix(Delta) # Delta here is (Dij) as a matrix
+dim(Delta) # Delta is a squared matrix with n=21
+head(Delta)
+```
+
+
+```{r}
+# 2) Check the dissimilarities properties (check that these scores correspond well to dissimilarities)
+diag(Delta) # is egal to 0 (which is good)
+sum(Delta - t(Delta)) # implies that Delta = t(Delta) <=> sum(Delta - t(Delta)) = 0 
+                      # => this matrix is symmetric
+```
+
+
+```{r}
+# 3) Compute the matrix Delta of squared dissimilarities
+Delta3 <- Delta%*%Delta
+Delta2 <- Delta^2
+```
+
+
+```{r}
+# 4) Compute the centering matrix J : J = I - (1/n)1(n,n)
+n <- ncol(Delta) # = nrow(Delta) 
+J <- diag(rep(1,n)) - (1/n)*matrix(1,n,n)
+#J
+
+# 5) Compute B = -1/2*J*Delta*J
+B <- -(1/2)*J%*%Delta2%*%J
+
+# B could be interpreted as a "pseudo" scal product
+# 6 + 7) Perform the spectral decomposition of B
+EigenB <- eigen(B)
+Lambda <- EigenB$values
+U <- EigenB$vectors # eigen vectors of B
+# U%*%diag(Lambda)%*%t(U) = B, check
+barplot(Lambda)
+# We keep the first 3 largest eigenvalues which are positive.
+print(paste("The eigen values which are negative: "))
+which(Lambda<0) 
+#print(paste("The eigen values which are negative: ", which(Lambda<0)))
+```
+
+The 6 first are myoglobines.
+The 7 next are Hemoglobines beta.
+The 7 next are Hemoglobines alpha
+The last one is a Globine 3.
+
+```{r}
+# 8 + 9)
+C13 <- U[,1:3] # we consider only the first 3 columns
+Lambda13 <- Lambda[1:3]
+X <- C13%*%diag(Lambda13)
+X
+rownames(Delta)
+```
+
+
+```{r}
+library(tidyverse)
+X <- as_tibble(X)
+names(X) <- paste("PC", 1:3, sep = "") # name is required, otherwise error
+ggplot(data = X, aes(x = PC1, y = PC2, label = row.names(Delta))) +
+  geom_point(col = "red") + geom_text(check_overlap = TRUE, col = "blue")
+```
+
+
+```{r}
+# 10) Use cmdscale function
+library(kernlab)
+library(FactoMineR)
+library(tidyverse)
+
+data("spam")
+dim(spam)
+spam %>% PCA(., quali.sup = ncol(spam)) %>%
+
+plot(habillage = ncol(spam), choix = "ind")
+
+res.pca = PCA(spam, quali.sup = ncol(spam))
+plot(res.pca, habillage = ncol(spam), choix = "ind")
+```
+
+```{r}
+computeJ<-function(n){
+  diag(rep(1,n))  - 1/n * matrix(1,n,n)->J
+}
+print(computeJ(2))
+PCoA<-eigen(B)
+plot(PCoA$values)
+abline(h=0)
+```
+
+```{r}
+eigenval<-diag(PCoA$values)
+eigenvect<-PCoA$vectors
+q<-3
+X<-eigenvect[,1:q]%*% sqrt(eigenval[1:q,1:q])
+rownames(X)<-rownames(D)
+pdf("PCoA.pdf")
+plot(X[,1:2])
+text(x=X[,1],y=X[,2],labels=rownames(X))
+dev.off()
+```
+```{r}
+# Type of proteins
+pch.type <- c(rep(1,6),rep(2,7), rep(3,7),4)
+# Different colors for the species
+colors <- c(1:6,4,7,8,1:3,5,4,7,5,1:3,8,9)
+plot(X[,1:2],pch=pch.type,col=colors)
+#text(x=X[,1],y=X[,2],labels=rownames(X),cex=0.5)
+```
+
+```{r}
+afp <- cmdscale(as.matrix(Delta), k=4, eig=TRUE)
+pch.type <- c(rep(1,6),rep(2,7), rep(3,7),4)
+colors <- c(1:6,4,7,8,1:3,5,4,7,5,1:3,8,9)
+plot(afp$points,pch=pch.type,col = rainbow(9)[colors])
+legend("topleft",legend=c("Myoglobin","Hemoglobin Beta","Hemoglobin Alpha","Globin-3"),pch=1:4)
+```
+
+
+
+
